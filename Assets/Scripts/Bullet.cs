@@ -12,22 +12,24 @@ public struct HitInfo
 
 public class Bullet : MonoBehaviour
 {
-
     Vector3 startPosition;
-    Vector3 startDirection;
+    Vector3 startDirection; // e_v
     Vector2 wind;
-    float startSpeed;
+    float mass; // m ( kg )
+    float startVelocity; // v_0
+    float velocity; // v
     float gravity = 9.82f;
 
     float startTime;
     bool isInitialized = false;
 
-    public void Initialize(Vector3 startPosition, Vector3 startDirection, Vector2 wind, float speed)
+    public void Initialize(Vector3 startPosition, Vector3 startDirection, Vector2 wind, float mass, float velocity)
     {
         this.startPosition = startPosition;
         this.startDirection = startDirection;
         this.wind = wind;
-        this.startSpeed = speed;
+        this.mass = mass;
+        this.startVelocity = velocity;
         isInitialized = true;
         startTime = -1;
     }
@@ -37,12 +39,17 @@ public class Bullet : MonoBehaviour
     //  Denna funktionen ger ut en vector från origo för positionen som 
     //  skåttet befinner sig vid på en viss tidspunkt (time) efter utskjutning
 
-    private Vector3 FindPointOnParabola(float time) // måste fortfarande lägga till vindmotstånd på skåttet?
+    private Vector3 FindPointOnParabola(float time) 
     {
-        Vector3 movementVector = startDirection * time * startSpeed;
+        Vector3 movementVector = startDirection * time * startVelocity; // c * v^2 * e_v
+        Vector3 gravityAdjustment = mass * gravity * Vector3.down * time * time; // m * g * e_v
         Vector3 windAdjustment = new Vector3(wind.x, 0, wind.y) * time * time;
-        Vector3 gravityAdjustment = Vector3.down * gravity * time * time;
         return startPosition + movementVector + gravityAdjustment + windAdjustment;
+    }
+
+    private float GetDragCoefficient()
+    {
+        return 0.0f;
     }
 
     private bool CastRayBetweenPoints(Vector3 startPoint, Vector3 endPoint, out RaycastHit hit)

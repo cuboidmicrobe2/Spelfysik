@@ -88,11 +88,12 @@ public class Player : MonoBehaviour
         Vector3 startPosition = cam.transform.position;
         Vector3 startDirection = cam.transform.forward;
         Vector2 windDirection = windManager.GetWind();
+        float bulletMass = 0.060f;
         float bulletSpeed = 200.0f; 
 
         Bullet bullet = Instantiate(bulletPrefab, transform.position, Quaternion.identity).GetComponent<Bullet>(); // Skapa en bullet i Scenen + skapa temporär referens
         
-        bullet.Initialize(startPosition, startDirection, windDirection, bulletSpeed);
+        bullet.Initialize(startPosition, startDirection, windDirection, bulletMass, bulletSpeed);
         
         lastBulletFire = bullet;
         Destroy(bullet, 20.0f); // Delete bullet if not hit anything for 20 sec
