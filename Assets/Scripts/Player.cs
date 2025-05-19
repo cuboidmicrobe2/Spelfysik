@@ -87,9 +87,10 @@ public class Player : MonoBehaviour
     {
         Vector3 startPosition = cam.transform.position;
         Vector3 startDirection = cam.transform.forward;
-        Vector2 windDirection = windManager.GetWind();
+        //Vector2 windDirection = windManager.GetWind();
+        Vector2 windDirection = new Vector2(-20f, 0f); // 20 sekundmeter i sidled tror jag iaf 
         float bulletMass = 0.060f;
-        float bulletSpeed = 200.0f; 
+        float bulletSpeed = 600.0f; 
 
         Bullet bullet = Instantiate(bulletPrefab, transform.position, Quaternion.identity).GetComponent<Bullet>(); // Skapa en bullet i Scenen + skapa temporär referens
         
