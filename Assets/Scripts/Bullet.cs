@@ -7,30 +7,38 @@ public struct HitInfo
     public Vector3 hitDirection;
     public float hitSpeed;
     public Bullet bullet;
-    //public bool destoryBullet;
 }
 
 public class Bullet : MonoBehaviour
 {
     Vector3 startPosition;
-    Vector3 direction; // e_v
+    Vector3 startDirection; 
     Vector2 wind;
-    Vector3 velocityVector;
+    Vector3 direction; // e_v
+    Vector3 velocityVector; // v * e_v
+
+    Vector3 dragForce; // F_d ( N )
+    Vector3 windForce; // F_wind ( N )
+    Vector3 gravityForce; // mg ( kgm/s² )
+
     float mass; // m ( kg )
     float startVelocity; // v_0  ( m/s )
     float velocity; // v  ( m/s )
+    float C_d; // C_d
+
     float gravity = 9.82f; // g  ( m/s² )
     float airDensity = 1.225f; // p ( kg/m³ )
     float bulletArea = 0.0001f; // A ( m² )
 
-    Vector3 currentPosition;
-
     float startTime;
+    Vector3 currentPosition;
+    Vector3 previousPosition;
     bool isInitialized = false;
 
     public void Initialize(Vector3 startPosition, Vector3 startDirection, Vector2 wind, float mass, float velocity)
     {
         this.startPosition = startPosition;
+        this.startDirection = startDirection;
         this.direction = startDirection;
         this.wind = wind;
         this.mass = mass;
@@ -40,42 +48,63 @@ public class Bullet : MonoBehaviour
         startTime = -1;
     }
 
+    public string GetUIInfo()
+    {
+        string infoString = $"Start Values:\n" + 
+                            $"V_0 (m/s):  {startVelocity:F2}\n" +
+                            $"Massa (kg): {mass:F4}\n" +
+                            $"Start Dir:  {startDirection}\n" +
+                            $"Start Pos:  {startPosition:F0}\n" +
+                            $"Wind:       {wind}\n" +
+                            $"\nDynamic Values:\n" +
+                            $"V (m/s):    {velocity:F2}\n" +
+                            $"V_dir:      {direction}\n" +
+                            $"C_d:        {C_d:F5}\n" +
+                            $"F_drag:     {dragForce}\n" +
+                            $"F_wind:     {windForce}\n" +
+                            $"Position:   {currentPosition:F0}";
+        
+        return infoString;
+    }
+
     private void SimulateStep(float deltaTime)
     {
-        // Beräkna enhetsvektor i riktning av velocity
-        Vector3 e_v = velocityVector.normalized; //e_v bortsett från vind, med vind används istället relativeWind
+        // Beräkna enhetsvektor i riktning av velocity,
+        // (behövs inte längre pga vind används istället)
+        //Vector3 e_v = velocityVector.normalized;
 
         // Luftmotståndskoefficient
-        float Cd = GetDragCoefficient(velocityVector.magnitude / 340.0f);
+        C_d = GetDragCoefficient(velocityVector.magnitude / 340.0f);
 
         // Total kraft: gravitation + drag + vind
         Vector3 windVelocity = new Vector3(wind.x, 0, wind.y);
-        Vector3 relativeWind = windVelocity - velocityVector;
-        float C_wind = 0.3f; // empirisk rimlig vind
-        Vector3 windForce = 0.5f * airDensity * C_wind * bulletArea * relativeWind.sqrMagnitude * relativeWind.normalized;
+        Vector3 relativeWind = windVelocity - velocityVector; 
+        float C_wind = 0.3f; // empirisk rimlig vind 
+        windForce = 0.5f * airDensity * C_wind * bulletArea * relativeWind.sqrMagnitude * relativeWind.normalized; // Wind force: F_d = -½ * p * C_wind * A * v² * e_v
 
-        Vector3 dragForce = 0.5f * airDensity * bulletArea * Cd * velocityVector.sqrMagnitude * relativeWind.normalized; // Drag force: F_d = -½ * p * C_d * A * v² * e_v
-        Vector3 gravityForce = mass * gravity * Vector3.down;
+        gravityForce = mass * gravity * Vector3.down; // m * g * (0, 0, -1)
+        dragForce = 0.5f * airDensity * C_d * bulletArea * velocityVector.sqrMagnitude * relativeWind.normalized; // Drag force: F_d = -½ * p * C_d * A * v² * e_v
 
-        Vector3 totalForce = gravityForce + dragForce + windForce;
+        Vector3 totalForce = gravityForce + dragForce + windForce; 
 
         // Acceleration
-        Vector3 acceleration = totalForce / mass;
+        Vector3 acceleration = totalForce / mass;      // a = F/m
 
         // Uppdatera velocity och position
-        velocityVector += deltaTime * acceleration;
-        currentPosition += deltaTime * velocityVector;
+        velocityVector += deltaTime * acceleration;    // v_i+1 = v_i + dt * a
+        currentPosition += deltaTime * velocityVector; // r_i+1 = r_i + dt * v
 
         // Uppdatera riktning och hastighet
         direction = velocityVector.normalized;
         velocity = velocityVector.magnitude;
-
-        Debug.Log($"[Step] V: {velocity:F2} | Dir: {direction} | Drag: {dragForce} | WindF: {windForce} | Pos: {currentPosition}");
     }
 
 
-    private float GetDragCoefficient(float velocityInMach) //referens
+    private float GetDragCoefficient(float velocityInMach) 
     {
+        // Funktionen är skapad efter en G1 standard projectile (Figure 1) från:
+        // https://appliedballisticsllc.com/wp-content/uploads/2021/06/Aerodynamic-Drag-Modeling-for-Ballistics.pdf 
+
         return (0.50f + (-0.63f / (1 + Mathf.Pow((float)Math.E, 9.57f * (velocityInMach - 0.96f)))) + 0.40f * (Mathf.Pow((float)Math.E, -0.27f * Mathf.Pow(velocityInMach + 0.33f, 2))));
     }
 
@@ -99,7 +128,7 @@ public class Bullet : MonoBehaviour
             shootableObject.OnHit(ref hitInfo);
         }
 
-        Destroy(gameObject); // Deleting bullet
+        Destroy(gameObject); // Deleting bullet on hit
     }
 
     private void FixedUpdate()
@@ -109,23 +138,25 @@ public class Bullet : MonoBehaviour
         {
             startTime = Time.time;
             currentPosition = startPosition;
+            previousPosition = currentPosition;
             velocityVector = direction * startVelocity;
         }
 
         RaycastHit hit;
-        float currentTime = Time.time - startTime;
-
-        Vector3 prevPoint = currentPosition;
+        Vector3 oldPosition = previousPosition;
+        previousPosition = currentPosition;
 
         // Simulera framåt ett steg i tiden
         SimulateStep(Time.fixedDeltaTime);
 
-        Vector3 nextPoint = currentPosition;
-
         // Collision detection (två raycasts per steg)
-        if (CastRayBetweenPoints(prevPoint, currentPosition, out hit))
+        if (CastRayBetweenPoints(oldPosition, previousPosition, out hit))
         {
-            OnHit(hit, currentPosition - prevPoint);
+            OnHit(hit, previousPosition - oldPosition);
+        }
+        if (CastRayBetweenPoints(previousPosition, currentPosition, out hit))
+        {
+            OnHit(hit, currentPosition - previousPosition);
         }
     }
 
